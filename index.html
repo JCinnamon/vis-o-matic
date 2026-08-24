@@ -164,7 +164,8 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 .tool-card span{font-size:.79rem;color:var(--text-muted);line-height:1.45}
 
 .proj-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem}
-.proj-head .btn{margin-left:auto}
+.proj-head-acts{margin-left:auto;display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
+.btn.icon{width:2rem;padding:.4rem 0;text-align:center;font-weight:600;line-height:1}
 .btn{font-family:var(--vom-font);font-size:.83rem;border-radius:var(--radius);padding:.4rem .85rem;
   border:1px solid transparent;cursor:pointer;background:var(--accent);color:#fff;transition:background .12s}
 .btn:hover{background:var(--accent-hover)}
@@ -248,7 +249,8 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 .pc-counts:hover{text-decoration:underline}
 .pc-counts .cv{color:var(--text)}
 .pc-counts .cv b{font-weight:600}
-.pc-counts .chev{display:inline-block;font-size:.66rem;color:var(--text-muted);width:.7em}
+.pc-counts .chev{display:inline-block;font-size:.95rem;line-height:1;color:var(--accent);width:.85em}
+.pc-counts:hover .chev{color:var(--primary-dark)}
 .pc-acts{margin-left:auto;display:flex;gap:.35rem;flex-wrap:wrap}
 .pc-detail{border-top:1px solid var(--border);background:var(--bg-page);padding:.7rem .9rem .8rem;
   font-size:.82rem}
@@ -260,6 +262,26 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 .pc-detail li .n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-detail li .x{color:var(--text-muted);font-size:.76rem;white-space:nowrap}
 .pc-detail .none{color:var(--text-muted);font-size:.8rem}
+/* Each section opens on its own. A season's project has four datasets, two
+   hundred outputs and a hundred runs, and pouring all three in at once made the
+   hub unusable at exactly the size it was built for. */
+.psec{border-top:1px solid var(--border)}
+.psec:first-child{border-top:0}
+.psec-head{display:flex;align-items:center;gap:.5rem;width:100%;text-align:left;border:0;
+  background:none;cursor:pointer;font:inherit;padding:.5rem .1rem;color:var(--text)}
+.psec-head:hover{color:var(--primary-dark)}
+.psec-tri{display:inline-block;width:1em;font-size:1rem;line-height:1;color:var(--accent)}
+.psec-label{font-family:var(--vom-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text-muted)}
+.psec-head:hover .psec-label{color:var(--text)}
+.psec-n{margin-left:auto;font-size:.78rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.psec.open .psec-n{color:var(--text)}
+.psec-body{padding:0 0 .6rem .1rem}
+.pc-detail .ods{font-size:.75rem;color:var(--text-muted);padding:.3rem 0 .05rem .6rem;
+  border-left:2px solid var(--border);margin-left:.15rem;font-style:italic}
+/* The rows belong to the dataset named above them, so they sit inside its rule
+   rather than beside it. */
+.pc-detail .ods + ul{border-left:2px solid var(--border);margin-left:.15rem;padding-left:.6rem}
 .pc-detail .oact{border:1px solid var(--border);background:var(--bg-white);color:var(--primary);
   border-radius:4px;cursor:pointer;font:inherit;font-size:.72rem;line-height:1;padding:.16rem .32rem;
   flex:0 0 auto}
@@ -354,8 +376,12 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 
       <div class="proj-head">
         <span class="meta" id="projCount"></span>
-        <button class="btn ghost" id="projImport" type="button">Import project file&hellip;</button>
-        <button class="btn" id="projNew" type="button">New project</button>
+        <span class="proj-head-acts">
+          <button class="btn ghost" id="projImport" type="button">Import project file&hellip;</button>
+          <button class="btn" id="projNew" type="button">New project</button>
+          <button class="btn ghost icon" id="projHelp" type="button"
+                  title="Where your work lives" aria-label="Where your work lives">?</button>
+        </span>
       </div>
       <div class="proj-list" id="projList"></div>
     </div>
@@ -370,35 +396,7 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
     <p class="proj-note" id="projNote"></p>
   </section>
 
-  <details class="lives">
-    <summary>Where your work lives</summary>
-    <div class="lives-body">
-      <p><b>Nothing is uploaded.</b> Every tool here runs in this browser tab, on this computer. There is
-      no server holding your images and no account to make.</p>
-      <p><b>A project lives in one of two places, chosen when you create it and never both.</b></p>
-      <ul>
-        <li><b>In a folder on your computer.</b> You pick the folder and it becomes the project. The
-        images are read straight from disk and never copied into browser storage, so a hundred 2:1 frames
-        cost nothing against the quota, your existing backups already cover them, and a collaborator who
-        gets the folder gets everything. Needs desktop Chrome, Edge or Arc — Firefox and Safari cannot let
-        a web page open a folder.</li>
-        <li><b>In this browser.</b> Works everywhere and needs no permission. The images are stored in the
-        browser's own database, which counts against a quota — roughly 500 MB for a hundred 2880×1440
-        frames — and a browser under storage pressure is allowed to clear it.</li>
-      </ul>
-      <p><b>Carrying work between machines.</b> A browser project can be <b>mirrored</b> into a folder you
-      already sync with OneDrive, Drive or Dropbox: its manifests, outputs and run log are written there
-      whenever it saves, and that service carries them. The mirror is <b>one-way</b> — the browser is
-      always the original, nothing is ever read back — and the images are not included. Two computers
-      writing to one mirror folder will overwrite each other.</p>
-      <p><b>The portable copy.</b> Whatever kind of project it is, <b>Export</b> gives you a single file
-      holding the dataset manifests with their session metadata and curation, the whole run log, and every
-      output. Not the images. That is the thing to attach to a data-availability statement, hand to a
-      co-author, or keep when a paper is done — and <b>Import project file</b> reads one back.</p>
-      <p class="lives-note">On a shared or lab computer, export before you leave. Browser storage is not
-      yours to rely on there.</p>
-    </div>
-  </details>
+
 
 <div id="pDlgBack"><div class="box">
   <div class="hh" id="pDlgTitle">New project</div>
@@ -408,17 +406,6 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
     <button class="btn" type="button" id="pDlgOk">Create</button>
   </div>
 </div></div>
-
-<div class="sec-title">What these tools do not do</div>
-  <div class="panel">
-    <p>They run on your machine, in a browser tab, which sets the limits. Very large image sets may make the browser sluggish. The Cutter downloads a model of between 20 and 300 MB the first time it runs, and needs WebGPU to avoid longer processing times, where possible.</p>
-    <p>The segmentation model proposes a mask; it does not verify one. Models inherit the biases of their training data and perform unevenly outside the settings they were trained on. Treat a mask as an instrument reading, report which model produced it, and check a sample by eye. Every export records the model and the device it ran on.</p>
-  </div>
-
-  <div class="sec-title">Privacy</div>
-  <div class="panel accent">
-    <p>No image ever leaves your computer. There is no server, no account and no upload step. The tools work offline. The Image Cutter only requires Web access once to download the Segment Anything model, which is then cached locally.</p>
-  </div>
 
   <div class="sec-title">Citing the tools</div>
   <div class="panel">
@@ -620,23 +607,41 @@ async function _vomUnique(dir,name){
 }
 
 /* o = {tool, name, blob, runId}. Returns what the run log should record. */
+/* Outputs are filed under the dataset they came from:
+
+       outputs/image-colour-analyzer/Ridge-evening/clusters.csv
+       outputs/image-colour-analyzer/Valley-bottom/clusters.csv
+
+   Two datasets measured with the same settings produce the same filenames, and
+   before this they landed in one directory where the second became
+   `clusters_2.csv` — a name that says nothing about which set it describes. In
+   a folder project those are files in Finder, so the only thing that can tell
+   them apart is where they sit.
+
+   An output made with no dataset open has no such folder and goes directly
+   under the tool, which is the honest place for it. */
 async function vomSaveOutput(p,handle,o){
   if(!p) throw new Error('no project open');
+  var dsName=(o.datasetName||'').trim();
+  var seg=dsName?vomSlug(dsName):'';
   if(p.store==='folder'){
     if(!handle) throw new Error('the project folder is not connected');
-    var dir=await _vomDirFor(handle,['outputs',o.tool]);
+    var names=seg?['outputs',vomSlug(o.tool),seg]:['outputs',vomSlug(o.tool)];
+    var dir=await _vomDirFor(handle,names);
     var name=await _vomUnique(dir,o.name);
     var fh=await dir.getFileHandle(name,{create:true});
     var w=await fh.createWritable();
     await w.write(o.blob);
     await w.close();
-    return {name:name, path:'outputs/'+o.tool+'/'+name, size:o.blob.size, where:'folder'};
+    return {name:name, path:names.join('/')+'/'+name, size:o.blob.size,
+            dataset:dsName, where:'folder'};
   }
   var rec={id:'o_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),
            projectId:p.id, tool:o.tool, runId:o.runId||null, name:o.name,
+           dataset:dsName, datasetId:o.datasetId||null,
            type:o.blob.type||'', size:o.blob.size, blob:o.blob, created:Date.now()};
   await _vomTx('outputs','readwrite',function(s){return s.put(rec);});
-  return {name:o.name, id:rec.id, size:rec.size, where:'browser'};
+  return {name:o.name, id:rec.id, size:rec.size, dataset:dsName, where:'browser'};
 }
 
 async function vomLogRun(p,handle,run){
@@ -690,7 +695,8 @@ async function vomOutputs(p,handle){
   if(!p) return [];
   if(p.store!=='folder'){
     var os=await _vomIdx('outputs',p.id);
-    return os.map(function(o){return {tool:o.tool,name:o.name,size:o.size,created:o.created,id:o.id};})
+    return os.map(function(o){return {tool:o.tool,name:o.name,size:o.size,created:o.created,
+                                      dataset:o.dataset||'',id:o.id};})
              .sort(function(a,b){return b.created-a.created;});
   }
   if(!handle) return [];
@@ -699,11 +705,23 @@ async function vomOutputs(p,handle){
     var root=await handle.getDirectoryHandle('outputs',{create:true});
     for await (var t of root.entries()){
       if(t[1].kind!=='directory') continue;
+      /* Two levels now: a file directly under the tool came from no dataset;
+         one a level deeper is filed under the dataset that produced it. Both
+         forms are read, so folders written before this still list. */
       for await (var f of t[1].entries()){
-        if(f[1].kind!=='file') continue;
-        var file=await f[1].getFile();
-        list.push({tool:t[0],name:f[0],size:file.size,created:file.lastModified,
-                   path:'outputs/'+t[0]+'/'+f[0]});
+        if(f[1].kind==='file'){
+          var file=await f[1].getFile();
+          list.push({tool:t[0],name:f[0],size:file.size,created:file.lastModified,
+                     dataset:'',path:'outputs/'+t[0]+'/'+f[0]});
+          continue;
+        }
+        if(f[1].kind!=='directory') continue;
+        for await (var g of f[1].entries()){
+          if(g[1].kind!=='file') continue;
+          var gf=await g[1].getFile();
+          list.push({tool:t[0],name:g[0],size:gf.size,created:gf.lastModified,
+                     dataset:f[0],path:'outputs/'+t[0]+'/'+f[0]+'/'+g[0]});
+        }
       }
     }
   }catch(err){}
@@ -1248,9 +1266,13 @@ async function vomOpenOutput(p,handle,o){
   if(!p||!o) return null;
   if(p.store==='folder'){
     if(!handle) throw new Error('the project folder is not connected');
-    var root=await handle.getDirectoryHandle('outputs',{create:false});
-    var td=await root.getDirectoryHandle(o.tool);
-    return await (await td.getFileHandle(o.name)).getFile();
+    /* Walk the path the listing recorded rather than assuming a depth — an
+       output filed under a dataset sits one level deeper than one that is not,
+       and guessing wrong reads as "the file is gone". */
+    var parts=(o.path||('outputs/'+o.tool+'/'+o.name)).split('/');
+    var d=handle;
+    for(var i=0;i<parts.length-1;i++) d=await d.getDirectoryHandle(parts[i]);
+    return await (await d.getFileHandle(parts[parts.length-1])).getFile();
   }
   var rec=await _vomTx('outputs','readonly',function(s){return s.get(o.id);});
   if(!rec||!rec.blob) return null;
@@ -1324,51 +1346,83 @@ async function vomOpenOutput(p,handle,o){
     return '<span class="cv">'+bits.join(' \u00b7 ')+'</span>';
   }
 
+  /* ── The detail, as three sections that open separately ───────────────────
+     A season's project has four datasets, two hundred outputs and a hundred
+     runs. Expanding it used to pour all three into the panel at once, which
+     made the hub unusable at exactly the size it was built for. Now each
+     section is its own disclosure with its own count, and all three start
+     closed: opening a project tells you what is in it without showing you. */
+  var OPEN_SEC = {};                       /* `${projectId}:${section}` -> true */
+
+  function secHtml(pid,key,label,n,body,empty){
+    var on = !!OPEN_SEC[pid+':'+key];
+    return '<div class="psec'+(on?' open':'')+'" data-sec="'+key+'">'+
+      '<button class="psec-head" type="button" data-act="sec" data-sec="'+key+'" '+
+        'aria-expanded="'+(on?'true':'false')+'">'+
+        '<span class="psec-tri">'+(on?'▾':'▸')+'</span>'+
+        '<span class="psec-label">'+label+'</span>'+
+        '<span class="psec-n">'+n+'</span></button>'+
+      '<div class="psec-body"'+(on?'':' hidden')+'>'+(n?body():empty)+'</div></div>';
+  }
+
+  function outRow(p,o){
+    var bits=[];
+    if(o.size) bits.push(Math.max(1,Math.round(o.size/1024))+' KB');
+    /* The date used to be baked into the filename. It is a fact about the file,
+       not part of its name, so it sits here and the name stays readable. */
+    if(o.created) bits.push(when(o.created));
+    return '<li><span class="n" title="'+esc(o.path||o.name)+'">'+esc(o.name)+'</span>'+
+      '<span class="x">'+bits.join(' · ')+'</span>'+
+      '<button class="oact" data-act="get" data-out="'+o._i+'" title="Download this file">⬇</button>'+
+      (p.store==='folder'?''
+        : '<button class="oact del" data-act="rmout" data-out="'+o._i+'" title="Delete this output">×</button>')+
+      '</li>';
+  }
+
   function detailHtml(p,t){
     if(!t) return '';
     if(t.locked){
       return '<p class="pc-warn">This project lives in a folder on your computer, and the browser has not '+
-        'kept permission to read it. Press <b>Open</b> \u2014 the click itself is what lets the browser ask '+
-        '\u2014 and its datasets and outputs appear here.</p>';
+        'kept permission to read it. Press <b>Open</b> — the click itself is what lets the browser ask '+
+        '— and its datasets and outputs appear here.</p>';
     }
     if(t.error) return '<p class="pc-warn">'+esc(t.error)+'</p>';
-    var h='<h4>Datasets</h4>';
-    h += t.datasets.length
-      ? '<ul>'+t.datasets.map(function(d){
-          return '<li><span class="n">'+esc(d.name)+'</span><span class="x">'+d.count+
-            ' image'+(d.count===1?'':'s')+(d.edited?' \u00b7 '+d.edited+' edited':'')+'</span></li>';
-        }).join('')+'</ul>'
-      : '<p class="none">Nothing yet \u2014 curate a set in Image Manager and file it into this project.</p>';
 
-    /* Every output is downloadable from here. A browser project's outputs sit
-       in a database no file manager can open, so a list that only NAMED them
-       would be a list of files you cannot have. Folder projects get the path
-       instead, because you already have those. */
-    h += '<h4>Outputs</h4>';
-    if(t.outputs.length){
-      var byTool={};
-      t.outputs.forEach(function(o,i){ o._i=i; (byTool[o.tool]=byTool[o.tool]||[]).push(o); });
-      h += Object.keys(byTool).sort().map(function(k){
-        return '<div class="tool">'+esc(k)+'</div><ul>'+byTool[k].map(function(o){
-          return '<li><span class="n" title="'+esc(o.path||o.name)+'">'+esc(o.name)+'</span>'+
-            '<span class="x">'+(o.size?Math.max(1,Math.round(o.size/1024))+' KB':'')+'</span>'+
-            '<button class="oact" data-act="get" data-out="'+o._i+'" title="Download this file">\u2b07</button>'+
-            (p.store==='folder'?''
-              : '<button class="oact del" data-act="rmout" data-out="'+o._i+'" title="Delete this output">\u00d7</button>')+
-            '</li>';
-        }).join('')+'</ul>';
-      }).join('');
-    } else {
-      h += '<p class="none">Nothing yet \u2014 run any tool with this project open and its results land here.</p>';
-    }
+    t.outputs.forEach(function(o,i){ o._i=i; });
 
-    if(t.runs.length){
-      h += '<h4>Recent runs</h4><ul>'+t.runs.slice(0,5).map(function(r){
-        return '<li><span class="n">'+esc(r.tool)+(r.datasetName?' \u2014 '+esc(r.datasetName):'')+
-          '</span><span class="x">'+when(r.created)+'</span></li>';
+    var ds = secHtml(p.id,'ds','Datasets',t.datasets.length, function(){
+      return '<ul>'+t.datasets.map(function(d){
+        return '<li><span class="n">'+esc(d.name)+'</span><span class="x">'+d.count+
+          ' image'+(d.count===1?'':'s')+(d.edited?' · '+d.edited+' edited':'')+
+          (d.pending?' · no images':'')+'</span></li>';
       }).join('')+'</ul>';
-    }
-    return h;
+    }, '<p class="none">Nothing yet — curate a set in Image Manager and file it into this project.</p>');
+
+    /* Grouped by tool, then by the dataset each output came from — which is
+       also where it sits on disk, so the panel and the folder agree. */
+    var outs = secHtml(p.id,'out','Outputs',t.outputs.length, function(){
+      var byTool={};
+      t.outputs.forEach(function(o){ (byTool[o.tool]=byTool[o.tool]||[]).push(o); });
+      return Object.keys(byTool).sort().map(function(k){
+        var byDs={};
+        byTool[k].forEach(function(o){ (byDs[o.dataset||'']=byDs[o.dataset||'']||[]).push(o); });
+        return '<div class="tool">'+esc(k)+'</div>'+
+          Object.keys(byDs).sort().map(function(dn){
+            return (dn?'<div class="ods">'+esc(dn)+'</div>':'')+
+              '<ul>'+byDs[dn].map(function(o){return outRow(p,o);}).join('')+'</ul>';
+          }).join('');
+      }).join('');
+    }, '<p class="none">Nothing yet — run any tool with this project open and its results land here.</p>');
+
+    var runs = secHtml(p.id,'run','Recent runs',t.runs.length, function(){
+      return '<ul>'+t.runs.slice(0,25).map(function(r){
+        return '<li><span class="n">'+esc(r.tool)+(r.datasetName?' — '+esc(r.datasetName):'')+
+          '</span><span class="x">'+when(r.created)+'</span></li>';
+      }).join('')+'</ul>'+
+      (t.runs.length>25?'<p class="none">and '+(t.runs.length-25)+' older</p>':'');
+    }, '<p class="none">Nothing run yet.</p>');
+
+    return ds+outs+runs;
   }
 
   async function render(){
@@ -1798,6 +1852,16 @@ async function vomOpenOutput(p,handle,o){
         } else det.hidden=true;
         return;
       }
+      if(act==='sec'){
+        var key=b.getAttribute('data-sec'), sec=b.closest('.psec');
+        var body=sec.querySelector('.psec-body'), opening=body.hidden;
+        OPEN_SEC[p.id+':'+key]=opening;
+        sec.classList.toggle('open',opening);
+        body.hidden=!opening;
+        b.setAttribute('aria-expanded',opening?'true':'false');
+        sec.querySelector('.psec-tri').textContent=opening?'▾':'▸';
+        return;
+      }
       if(act==='get')    return getOutput(p, card, b.getAttribute('data-out'));
       if(act==='rmout')  return removeOutput(p, card, b.getAttribute('data-out'));
       if(act==='export') return exportProject(p, b);
@@ -1811,6 +1875,12 @@ async function vomOpenOutput(p,handle,o){
     document.getElementById('tabProjects').addEventListener('click', function(){ setTab('projects'); });
     document.getElementById('tabLibrary').addEventListener('click', function(){ setTab('library'); });
     document.getElementById('projImport').addEventListener('click', importProjectDialog);
+    document.getElementById('projHelp').addEventListener('click', function(){
+      /* Storage is the thing people get wrong, and it was a section nobody
+         scrolled to. Behind the button beside the one that CREATES a project is
+         where the question actually comes up. */
+      dialog('Where your work lives', '<div class="lives-body">    <p><b>Nothing is uploaded.</b> Every tool here runs in this browser tab, on this computer. There is    no server holding your images and no account to make.</p>    <p><b>A project lives in one of two places, chosen when you create it and never both.</b></p>    <ul>     <li><b>In a folder on your computer.</b> You pick the folder and it becomes the project. The     images are read straight from disk and never copied into browser storage, so a hundred 2:1 frames     cost nothing against the quota, your existing backups already cover them, and a collaborator who     gets the folder gets everything. Needs desktop Chrome, Edge or Arc — Firefox and Safari cannot let     a web page open a folder.</li>     <li><b>In this browser.</b> Works everywhere and needs no permission. The images are stored in the     browser\'s own database, which counts against a quota — roughly 500 MB for a hundred 2880×1440     frames — and a browser under storage pressure is allowed to clear it.</li>    </ul>    <p><b>Carrying work between machines.</b> A browser project can be <b>mirrored</b> into a folder you    already sync with OneDrive, Drive or Dropbox: its manifests, outputs and run log are written there    whenever it saves, and that service carries them. The mirror is <b>one-way</b> — the browser is    always the original, nothing is ever read back — and the images are not included. Two computers    writing to one mirror folder will overwrite each other.</p>    <p><b>The portable copy.</b> Whatever kind of project it is, <b>Export</b> gives you a single file    holding the dataset manifests with their session metadata and curation, the whole run log, and every    output. Not the images. That is the thing to attach to a data-availability statement, hand to a    co-author, or keep when a paper is done — and <b>Import project file</b> reads one back.</p>    <p class="lives-note">On a shared or lab computer, export before you leave. Browser storage is not    yours to rely on there.</p>   ', 'Close', function(){ closeDialog(); });
+    });
 
     /* Filing, from the library side. Ticking writes straight through — a Save
        button on a tick-list is a second chance to lose the change. */
