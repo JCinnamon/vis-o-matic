@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1031,14 +1032,62 @@ async function vomOpenDataset(p,handle,dsId,onProgress){
   if(!db) return [];
   var recs=await _vomMgrReq(db,'images',function(s){return s.index('dsId').getAll(dsId);});
   (recs||[]).sort(function(a,b){return _vomNat(a.name,b.name);});
-  var out=[];
+
+  /* A dataset belongs to a LIST of projects but its bytes live in exactly one
+     place. Once it has been adopted into a folder project the files are on disk
+     and the browser copies are freed — so a second project listing the same
+     dataset finds records with `fsFile` and no blob behind them.
+
+     That used to be a `continue`, which handed back an empty array: the picker
+     listed "Shared set · 3 images" and opened nothing, silently. So the folder
+     is followed instead, through whichever project owns it, and when it cannot
+     be reached this SAYS SO rather than pretending the dataset is empty. */
+  var dir=null, dirTried=false;
+  async function folderDir(){
+    if(dirTried) return dir;
+    dirTried=true;
+    var ds=null;
+    try{ ds=await _vomMgrReq(db,'datasets',function(s){return s.get(dsId);}); }catch(e){}
+    if(!ds||!ds.fs||!ds.fs.slug) return null;
+    var owners=(ds.projectIds||[]).slice();
+    if(p.store==='folder') owners.unshift(p.id);
+    for(var i=0;i<owners.length;i++){
+      var op=null;
+      try{ op=await vomProjectGet(owners[i]); }catch(e){}
+      if(!op||op.store!=='folder') continue;
+      var q=await vomQuietAccess(op);
+      if(!q.ok) continue;
+      try{
+        var root=await q.handle.getDirectoryHandle('datasets',{create:false});
+        dir=await root.getDirectoryHandle(ds.fs.slug);
+        return dir;
+      }catch(e){}
+    }
+    return null;
+  }
+
+  var out=[], missing=0;
   for(var j=0;j<recs.length;j++){
     var r=recs[j],b=null;
+    if(r.fsFile){
+      var d=await folderDir();
+      if(d){
+        try{ out.push(await (await d.getFileHandle(r.fsFile)).getFile()); }
+        catch(e){ missing++; }
+      } else missing++;
+      if(onProgress) onProgress(j+1,recs.length);
+      continue;
+    }
     try{ b=await _vomMgrReq(db,'blobs',function(s){return s.get(r.id);}); }catch(err){}
-    if(!b||!b.blob) continue;         /* a folder-held record inside a browser project */
+    if(!b||!b.blob){ missing++; continue; }
     out.push(new File([b.blob],r.origName||r.name,
       {type:r.type||b.blob.type||'image/jpeg',lastModified:r.dateMs||r.added||Date.now()}));
     if(onProgress) onProgress(j+1,recs.length);
+  }
+  if(!out.length && missing){
+    throw new Error('This dataset’s images live in a project folder on your computer, and that folder ' +
+      'is not reachable from here. Open the folder project once — the click is what lets the browser ' +
+      'ask for permission — and it will work from every project it belongs to.');
   }
   return out;
 }
