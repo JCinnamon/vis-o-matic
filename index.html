@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -164,6 +163,26 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 .tool-card b{font-family:var(--vom-display);font-size:1rem;font-weight:400;color:var(--primary-dark);line-height:1.2}
 .tool-card span{font-size:.79rem;color:var(--text-muted);line-height:1.45}
 
+/* The hub's own name. Every tool's project bar has a "Projects hub" button
+   pointing here, and until this line existed you arrived at a box labelled
+   "Projects" and had to infer it was the same thing. */
+.hub-brand{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem}
+.hub-mark{font-size:1.05rem;color:var(--accent);line-height:1}
+.hub-name{font-family:var(--vom-display);font-size:1.24rem;font-weight:400;letter-spacing:.01em;
+  color:var(--primary-dark);line-height:1.1}
+.hub-tag{font-size:.78rem;color:var(--text-muted)}
+/* What the library costs, shown where you decide what to keep. */
+.lib-store{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-bottom:.8rem;
+  padding:.5rem .7rem;background:var(--bg-page);border:1px solid var(--border);border-radius:var(--radius);
+  font-size:.79rem;color:var(--text-muted)}
+.lib-store b{color:var(--text);font-weight:600}
+.lib-store .bar{flex:0 0 auto;width:96px;height:6px;border-radius:3px;background:var(--border);
+  overflow:hidden}
+.lib-store .bar i{display:block;height:100%;background:var(--accent)}
+.lib-store .sep{opacity:.5}
+.dcard .dact{margin-left:auto;flex:0 0 auto;border:0;background:transparent;color:var(--text-muted);
+  font-size:1rem;line-height:1;cursor:pointer;padding:.1rem .3rem;border-radius:4px}
+.dcard .dact:hover{background:var(--danger-bg);color:var(--danger)}
 .proj-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem}
 .proj-head-acts{margin-left:auto;display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
 .btn.icon{width:2rem;padding:.4rem 0;text-align:center;font-weight:600;line-height:1}
@@ -366,6 +385,11 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
   </div>
 
   <section class="proj-box" id="projects">
+    <div class="hub-brand">
+      <span class="hub-mark">▦</span>
+      <span class="hub-name">Projects Hub</span>
+      <span class="hub-tag">where your work is kept</span>
+    </div>
     <div class="hub-tabs">
       <button class="hub-tab active" id="tabProjects" type="button">Projects</button>
       <button class="hub-tab" id="tabLibrary" type="button">Data library</button>
@@ -391,6 +415,7 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
       <p class="lede">Every dataset you have, across all your projects. A dataset is not copied into a
       project — it is <b>referenced</b>, so one set can belong to several without taking the space twice.
       Tick a project to file it there.</p>
+      <div class="lib-store" id="libStore"></div>
       <div class="proj-list" id="libList"></div>
     </div>
 
@@ -923,6 +948,70 @@ function _vomMgrReq(db,store,fn){
   });
 }
 
+/* ── What the library actually costs ──────────────────────────────────────
+   The Manager has always shown this beside its own sidebar. The hub is where
+   you now decide what to keep, so the number has to be visible where the
+   decision is made — otherwise "delete a dataset" is a guess about which one
+   is heavy.
+
+   The tally is our own: `navigator.storage.estimate()` reports the whole
+   origin, thumbnails and outputs included, and rounds hard. Both are shown,
+   because the difference between them is itself informative. */
+async function vomLibraryBytes(){
+  var out={count:0,total:0,onDisk:0,perDs:{}};
+  var db=await vomManagerDb();
+  if(!db) return out;
+  var recs=await _vomMgrReq(db,'images',function(s){return s.getAll();})||[];
+  for(var i=0;i<recs.length;i++){
+    var r=recs[i];
+    out.count++;
+    if(r.fsFile){ out.onDisk++; continue; }        /* on disk: costs nothing here */
+    var n=r.size||0;
+    out.total+=n;
+    out.perDs[r.dsId]=(out.perDs[r.dsId]||0)+n;
+  }
+  return out;
+}
+
+async function vomStorageEstimate(){
+  var o={usage:null,quota:null,persisted:null};
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      var e=await navigator.storage.estimate();
+      o.usage=e.usage||0; o.quota=e.quota||0;
+    }
+    if(navigator.storage&&navigator.storage.persisted) o.persisted=await navigator.storage.persisted();
+  }catch(e){}
+  return o;
+}
+
+/* Deleting a dataset from the library — the browser copies, which for a
+   browser-stored dataset are the only copies. Records pointing at files on
+   disk lose their RECORD and keep their FILE: this never reaches into a folder
+   the user owns, the same rule every other removal here follows. */
+async function vomDeleteLibraryDataset(dsId){
+  var db=await vomManagerDb();
+  if(!db) throw new Error('the Image Manager library is not available in this browser');
+  var recs=await _vomMgrReq(db,'images',function(s){return s.index('dsId').getAll(dsId);})||[];
+  var ids=recs.map(function(r){return r.id;});
+  var freed=recs.reduce(function(n,r){return n+(r.fsFile?0:(r.size||0));},0);
+  var stores=['images','thumbs','blobs'].filter(function(n){return db.objectStoreNames.contains(n);});
+  for(var i=0;i<ids.length;i+=300){
+    var chunk=ids.slice(i,i+300);
+    await new Promise(function(res,rej){
+      var tx=db.transaction(stores,'readwrite');
+      stores.forEach(function(n){ var st=tx.objectStore(n); chunk.forEach(function(id){ st.delete(id); }); });
+      tx.oncomplete=res; tx.onerror=function(){rej(tx.error);};
+    });
+  }
+  await new Promise(function(res,rej){
+    var tx=db.transaction('datasets','readwrite');
+    tx.objectStore('datasets').delete(dsId);
+    tx.oncomplete=res; tx.onerror=function(){rej(tx.error);};
+  });
+  return {images:ids.length,freed:freed};
+}
+
 /* Every dataset in this project, whichever store it lives in. `count` is what
    is actually there right now, not what a record last claimed. */
 async function vomDatasets(p,handle){
@@ -940,6 +1029,10 @@ async function vomDatasets(p,handle){
         doc=JSON.parse(await (await dh.getFile()).text());
       }catch(err){ continue; }        /* a bare folder of images is not a dataset */
       if(!doc||doc.format!=='vom-dataset') continue;
+      /* Removed from this project. The folder and every image in it are still
+         there — that is the whole point — but the project has been told to stop
+         listing it, and a scan that ignored this would put it straight back. */
+      if(doc.removed) continue;
       var ex={}; (doc.excluded||[]).forEach(function(n){ex[n]=1;});
       var count=0, edited=0;
       for await (var f of e[1].entries())
@@ -980,6 +1073,43 @@ async function vomDatasets(p,handle){
                pending:true,doc:d});
   });
   return out2.sort(function(a,b){return _vomNat(a.name,b.name);});
+}
+
+/* What has been removed from this folder project, so the promise that nothing
+   was deleted can be CHECKED rather than believed. Restoring clears the stamp;
+   the next scan finds the dataset exactly as it was, curation included. */
+async function vomRemovedDatasets(p,handle){
+  if(!p||p.store!=='folder'||!handle) return [];
+  var root;
+  try{ root=await handle.getDirectoryHandle('datasets',{create:false}); }catch(e){ return []; }
+  var out=[];
+  for await (var e of root.entries()){
+    if(e[1].kind!=='directory') continue;
+    var doc=null;
+    try{
+      var dh=await e[1].getFileHandle('dataset.json');
+      doc=JSON.parse(await (await dh.getFile()).text());
+    }catch(err){ continue; }
+    if(!doc||doc.format!=='vom-dataset'||!doc.removed) continue;
+    var count=0;
+    for await (var f of e[1].entries())
+      if(f[1].kind==='file'&&VOM_IMG_RE.test(f[0])) count++;
+    out.push({id:doc.id,name:doc.name||e[0],slug:e[0],count:count,removed:doc.removed});
+  }
+  return out.sort(function(a,b){return _vomNat(a.name,b.name);});
+}
+
+async function vomRestoreDataset(p,handle,slug){
+  if(!p||p.store!=='folder'||!handle) throw new Error('the project folder is not connected');
+  var root=await handle.getDirectoryHandle('datasets',{create:false});
+  var dir=await root.getDirectoryHandle(slug);
+  var fh=await dir.getFileHandle('dataset.json');
+  var doc=JSON.parse(await (await fh.getFile()).text());
+  delete doc.removed;
+  var w=await (await dir.getFileHandle('dataset.json',{create:true})).createWritable();
+  await w.write(JSON.stringify(doc,null,2));
+  await w.close();
+  return doc.name||slug;
 }
 
 /* The dataset's images as ordinary File objects, ready to hand to whatever the
@@ -1332,6 +1462,12 @@ async function vomOpenOutput(p,handle,o){
 (function(){
   var listEl, countEl, noteEl, back, titleEl, bodyEl, okBtn, cancelBtn, onOk=null;
 
+  function fmtB(n){
+    if(!n) return '0 B';
+    var u=['B','KB','MB','GB','TB'],i=0;
+    while(n>=1024&&i<u.length-1){ n/=1024; i++; }
+    return (n<10&&i?n.toFixed(1):Math.round(n))+' '+u[i];
+  }
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function when(ms){
@@ -1376,7 +1512,9 @@ async function vomOpenOutput(p,handle,o){
     var t={};
     try{
       var ds=await vomDatasets(p,h), outs=await vomOutputs(p,h), runs=await vomRuns(p,h);
-      t={datasets:ds, outputs:outs, runs:runs,
+      var rm=[];
+      try{ rm=await vomRemovedDatasets(p,h); }catch(e){ rm=[]; }
+      t={datasets:ds, outputs:outs, runs:runs, removed:rm,
          images:ds.reduce(function(n,d){return n+(d.count||0);},0)};
     }catch(e){ t={error:e.message||String(e)}; }
     TALLY[p.id]=t;
@@ -1471,7 +1609,24 @@ async function vomOpenOutput(p,handle,o){
       (t.runs.length>25?'<p class="none">and '+(t.runs.length-25)+' older</p>':'');
     }, '<p class="none">Nothing run yet.</p>');
 
-    return ds+outs+runs;
+    /* Removal promised that nothing on disk was touched. This is where that can
+       be checked — and undone. Only ever present when there IS something in it,
+       so a project nobody has removed anything from carries no extra furniture. */
+    var rm = (t.removed && t.removed.length)
+      ? secHtml(p.id,'rm','Removed from this project',t.removed.length, function(){
+          return '<ul>'+t.removed.map(function(d){
+            return '<li><span class="n">'+esc(d.name)+'</span>'+
+              '<span class="x">'+d.count+' image'+(d.count===1?'':'s')+
+                ' · still in datasets/'+esc(d.slug)+'</span>'+
+              '<button class="oact" data-act="restore" data-slug="'+esc(d.slug)+'" '+
+                'title="List this dataset in the project again">Restore</button></li>';
+          }).join('')+'</ul>'+
+          '<p class="none">These folders were never deleted. Restoring lists them again, '+
+          'with their curation intact.</p>';
+        }, '')
+      : '';
+
+    return ds+outs+runs+rm;
   }
 
   async function render(){
@@ -1535,9 +1690,34 @@ async function vomOpenOutput(p,handle,o){
      — a dataset carries a LIST of projects, so one set can sit in several and
      is never duplicated — but you had to open the Manager to see it. The hub
      could say what projects you had and not what data you had. */
+  async function renderStorage(){
+    var el=document.getElementById('libStore');
+    if(!el) return;
+    var lib=await vomLibraryBytes(), est=await vomStorageEstimate();
+    var pct = (est.quota ? Math.min(100, Math.round((est.usage/est.quota)*1000)/10) : null);
+    var bits=[
+      '<span><b>'+lib.count+'</b> image'+(lib.count===1?'':'s')+' in the library</span>',
+      '<span class="sep">·</span>',
+      '<span><b>'+fmtB(lib.total)+'</b> stored in this browser</span>',
+    ];
+    /* Images read from a folder project cost nothing here, and saying so is the
+       argument for folder projects made with the user's own numbers. */
+    if(lib.onDisk) bits.push('<span class="sep">·</span><span><b>'+lib.onDisk+
+      '</b> read from disk, costing no browser storage</span>');
+    if(pct!==null){
+      bits.push('<span class="bar" title="'+fmtB(est.usage)+' of about '+fmtB(est.quota)+
+        ' used by this site"><i style="width:'+Math.max(1,pct)+'%"></i></span>');
+      bits.push('<span>'+pct+'% of this site’s browser storage</span>');
+    }
+    if(est.persisted===false) bits.push('<span class="sep">·</span><span>not marked persistent — '+
+      'the browser may clear it under pressure</span>');
+    el.innerHTML=bits.join('');
+  }
+
   async function renderLibrary(){
     var el=document.getElementById('libList');
     if(!el) return;
+    await renderStorage();
     var ps=await vomProjects();
     var db=await vomManagerDb();
     var rows=[];
@@ -1547,6 +1727,7 @@ async function vomOpenOutput(p,handle,o){
         var recs=await _vomMgrReq(db,'images',function(s){return s.index('dsId').getAll(dss[i].id);})||[];
         rows.push({id:dss[i].id,name:dss[i].name,note:dss[i].note||'',
                    count:recs.length,
+                   bytes:recs.reduce(function(n,r){return n+(r.fsFile?0:(r.size||0));},0),
                    onDisk:recs.some(function(r){return !!r.fsFile;}),
                    projectIds:dss[i].projectIds||[]});
       }
@@ -1577,11 +1758,14 @@ async function vomOpenOutput(p,handle,o){
             : '<span class="none">No projects yet \u2014 make one on the Projects tab.</span>');
       return '<div class="dcard" data-id="'+d.id+'">'+
         '<div class="dtop"><span class="nm">'+esc(d.name)+'</span>'+
-          '<span class="x">'+d.count+' image'+(d.count===1?'':'s')+'</span>'+
+          '<span class="x">'+d.count+' image'+(d.count===1?'':'s')+
+            (d.bytes?' · '+fmtB(d.bytes):'')+'</span>'+
           (d.pending?'<span class="pill pending">no images</span>'
                     :'<span class="pill '+(d.onDisk?'folder':'browser')+'">'+
                      (d.onDisk?'on disk':'in browser')+'</span>')+
           (d.note?'<span class="x">'+esc(d.note.slice(0,80))+'</span>':'')+
+          '<button class="dact" data-del="'+d.id+'" title="Remove this dataset from the library">'+
+            '×</button>'+
         '</div><div class="chips">'+chips+'</div></div>';
     }).join('');
   }
@@ -1676,6 +1860,21 @@ async function vomOpenOutput(p,handle,o){
     a.href=u; a.download=o.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){URL.revokeObjectURL(u);},4000);
+  }
+
+  /* Putting back what was never thrown away. */
+  async function restoreDataset(p, slug, btn){
+    if(btn){ btn.disabled=true; btn.textContent='Restoring…'; }
+    try{ await vomRestoreDataset(p, HANDLES[p.id]||null, slug); }
+    catch(e){
+      if(btn){ btn.disabled=false; btn.textContent='Restore'; }
+      alert('Could not restore it — '+((e&&e.message)||'the project folder is not reachable')+'.');
+      return;
+    }
+    delete TALLY[p.id];
+    await render();
+    var again=listEl.querySelector('.pcard[data-id="'+p.id+'"] .pc-counts');
+    if(again) again.click();
   }
 
   async function removeOutput(p, card, i){
@@ -1911,6 +2110,7 @@ async function vomOpenOutput(p,handle,o){
         sec.querySelector('.psec-tri').textContent=opening?'▾':'▸';
         return;
       }
+      if(act==='restore') return restoreDataset(p, b.getAttribute('data-slug'), b);
       if(act==='get')    return getOutput(p, card, b.getAttribute('data-out'));
       if(act==='rmout')  return removeOutput(p, card, b.getAttribute('data-out'));
       if(act==='export') return exportProject(p, b);
@@ -1929,6 +2129,38 @@ async function vomOpenOutput(p,handle,o){
          scrolled to. Behind the button beside the one that CREATES a project is
          where the question actually comes up. */
       dialog('Where your work lives', '<div class="lives-body">    <p><b>Nothing is uploaded.</b> Every tool here runs in this browser tab, on this computer. There is    no server holding your images and no account to make.</p>    <p><b>A project lives in one of two places, chosen when you create it and never both.</b></p>    <ul>     <li><b>In a folder on your computer.</b> You pick the folder and it becomes the project. The     images are read straight from disk and never copied into browser storage, so a hundred 2:1 frames     cost nothing against the quota, your existing backups already cover them, and a collaborator who     gets the folder gets everything. Needs desktop Chrome, Edge or Arc — Firefox and Safari cannot let     a web page open a folder.</li>     <li><b>In this browser.</b> Works everywhere and needs no permission. The images are stored in the     browser\'s own database, which counts against a quota — roughly 500 MB for a hundred 2880×1440     frames — and a browser under storage pressure is allowed to clear it.</li>    </ul>    <p><b>Carrying work between machines.</b> A browser project can be <b>mirrored</b> into a folder you    already sync with OneDrive, Drive or Dropbox: its manifests, outputs and run log are written there    whenever it saves, and that service carries them. The mirror is <b>one-way</b> — the browser is    always the original, nothing is ever read back — and the images are not included. Two computers    writing to one mirror folder will overwrite each other.</p>    <p><b>The portable copy.</b> Whatever kind of project it is, <b>Export</b> gives you a single file    holding the dataset manifests with their session metadata and curation, the whole run log, and every    output. Not the images. That is the thing to attach to a data-availability statement, hand to a    co-author, or keep when a paper is done — and <b>Import project file</b> reads one back.</p>    <p class="lives-note">On a shared or lab computer, export before you leave. Browser storage is not    yours to rely on there.</p>   ', 'Close', function(){ closeDialog(); });
+    });
+
+    /* Removing a dataset from the library. Same act as the Manager's delete and
+       worded the same way, because a dataset the hub can file into a project is
+       one the hub should be able to let go of. */
+    document.getElementById('libList').addEventListener('click', async function(e){
+      var b=e.target.closest?e.target.closest('button[data-del]'):null;
+      if(!b) return;
+      var dsId=b.getAttribute('data-del');
+      var card=b.closest('.dcard'), nm=card?card.querySelector('.nm').textContent:'this dataset';
+      var db=await vomManagerDb();
+      var d=db?await _vomMgrReq(db,'datasets',function(s){return s.get(dsId);}):null;
+      var recs=db?(await _vomMgrReq(db,'images',function(s){return s.index('dsId').getAll(dsId);})||[]):[];
+      var onDisk=recs.some(function(r){return !!r.fsFile;});
+      var freed=recs.reduce(function(n,r){return n+(r.fsFile?0:(r.size||0));},0);
+      dialog('Remove “'+esc(nm)+'” from the library',
+        '<p>'+recs.length+' image'+(recs.length===1?'':'s')+' — the dataset, its curation and its '+
+          'thumbnails are deleted from this browser'+(freed?', freeing about <b>'+fmtB(freed)+'</b>':'')+'.</p>'+
+        (onDisk
+          ? '<p style="color:var(--text-muted)">Its image FILES live in a project folder on your computer. '+
+            'Those are not touched — only this browser’s record of them goes.</p>'
+          : '<p style="color:var(--text-muted)">These copies live in this browser and are the only ones. '+
+            'This cannot be undone.</p>')+
+        '<div class="err"></div>',
+        'Remove', async function(){
+          try{ await vomDeleteLibraryDataset(dsId); }
+          catch(ex){ err(ex&&ex.message?ex.message:'Could not remove it.'); return; }
+          (d&&d.projectIds||[]).forEach(function(pid){ delete TALLY[pid]; });
+          closeDialog();
+          await renderLibrary();
+          await render();
+        });
     });
 
     /* Filing, from the library side. Ticking writes straight through — a Save
