@@ -1829,22 +1829,110 @@ async function vomOpenOutput(p,handle,o){
       });
   }
 
-  function deleteDialog(p){
-    var folder = p.store==='folder';
-    dialog('Delete project',
-      '<p>Remove <b>'+esc(p.name)+'</b> from your project list?</p>'+
-      (folder
-        ? '<p style="color:var(--text-muted)">The folder on your computer is <b>not touched</b>. '+
-          'Nothing is deleted from disk \u2014 only the link to it from here.</p>'
-        : '<p style="color:var(--danger)">This project lives in the browser, so its datasets go with it. '+
-          'That cannot be undone from here.</p>')+
-      '<div class="err"></div>',
-      'Delete', async function(){
-        await vomProjectDel(p.id);
-        var cur=await vomCurrentId();
-        if(cur===p.id) await vomSetCurrent(null);
-        closeDialog(); await render();
+  /* Everything a browser project holds, split into the datasets only it uses and
+     those another project also uses. Only the first kind can ever be deleted with it. */
+  async function browserProjectContents(p){
+    var c={own:[],shared:[],images:0,outputs:[],runs:[],manifests:[],mirrored:false};
+    var db=await vomManagerDb();
+    if(db){
+      var live={}; (await vomProjects()).forEach(function(x){live[x.id]=1;});
+      var dss=await _vomMgrReq(db,'datasets',function(s){return s.getAll();})||[];
+      for(var i=0;i<dss.length;i++){
+        var ids=dss[i].projectIds||[];
+        if(ids.indexOf(p.id)<0) continue;
+        if(ids.some(function(x){return x!==p.id&&live[x];})){ c.shared.push(dss[i]); continue; }
+        c.own.push(dss[i]);
+        var recs=await _vomMgrReq(db,'images',function(s){return s.index('dsId').getAll(dss[i].id);})||[];
+        c.images+=recs.length;
+      }
+    }
+    c.outputs=await _vomIdx('outputs',p.id);
+    c.runs=await _vomIdx('runs',p.id);
+    c.manifests=await _vomIdx('manifests',p.id);
+    try{ c.mirrored=!!(await vomMirrorGet(p.id)); }catch(e){}
+    return c;
+  }
+  /* A dataset that stays must stop naming the project, or it vanishes from the
+     Image Manager's list of datasets that are not in a project. */
+  async function unlinkDatasets(p,list){
+    if(!list.length) return;
+    var db=await vomManagerDb();
+    await new Promise(function(res,rej){
+      var tx=db.transaction('datasets','readwrite'), st=tx.objectStore('datasets');
+      list.forEach(function(d){
+        d.projectIds=(d.projectIds||[]).filter(function(x){return x!==p.id;});
+        st.put(d);
       });
+      tx.oncomplete=res; tx.onerror=function(){rej(tx.error);};
+    });
+  }
+  async function finishDelete(p){
+    await vomMirrorDel(p.id);
+    await vomProjectDel(p.id);
+    var cur=await vomCurrentId();
+    if(cur===p.id) await vomSetCurrent(null);
+    TALLY={};
+    closeDialog(); await render();
+  }
+  async function deleteDialog(p){
+    if(p.store==='folder'){
+      dialog('Delete project',
+        '<p>Remove <b>'+esc(p.name)+'</b> from your project list?</p>'+
+        '<p style="color:var(--text-muted)">The folder on your computer is <b>not touched</b>. '+
+        'Nothing is deleted from disk \u2014 only the link to it from here.</p>'+
+        '<div class="err"></div>',
+        'Delete', async function(){ await vomProjectDel(p.id);
+          var cur=await vomCurrentId(); if(cur===p.id) await vomSetCurrent(null);
+          closeDialog(); await render(); });
+      return;
+    }
+    var c;
+    try{ c=await browserProjectContents(p); }
+    catch(e){ alert('Could not read this project \u2014 '+((e&&e.message)||'unknown error')+'.'); return; }
+    var plural=function(n,one,many){return n+' '+(n===1?one:(many||one+'s'));};
+    var hasData=c.own.length||c.outputs.length||c.runs.length||c.manifests.length;
+    var parts=[];
+    if(c.own.length) parts.push(plural(c.own.length,'dataset')+' ('+plural(c.images,'image')+')');
+    if(c.outputs.length) parts.push(plural(c.outputs.length,'output'));
+    if(c.runs.length) parts.push(plural(c.runs.length,'run-log entry','run-log entries'));
+    var keepNote='Images stay in the Image Manager, outside any project. '+
+      (c.outputs.length||c.runs.length?'Outputs and the run log stay in browser storage, but nothing will list them or let you open them.':'');
+    var goneNote='<b>This cannot be undone.</b> These are deleted from this browser.';
+    var extras=(c.shared.length?'<p style="color:var(--text-muted)">'+plural(c.shared.length,'dataset')+
+        ' also used by another project will be kept.</p>':'')+
+      (c.mirrored?'<p style="color:var(--text-muted)">The backup copy in your folder is not touched.</p>':'');
+    dialog('Delete project',
+      '<p>Delete <b>'+esc(p.name)+'</b>?</p>'+
+      (parts.length?'<p>This project has '+esc(parts.join(', '))+'.</p>':'<p>This project is empty.</p>')+
+      (hasData
+        ?'<label style="display:flex;gap:.5rem;align-items:flex-start;margin:.7rem 0 .4rem;font-weight:600;text-transform:none;letter-spacing:0">'+
+           '<input type="checkbox" id="pDelAll" style="width:auto;margin-top:.2rem"><span>Also delete images and outputs</span></label>'+
+         '<p id="pDelNote" style="color:var(--text-muted)">'+keepNote+'</p>'
+        :'')+
+      extras+'<div class="err"></div>',
+      'Delete project', async function(){
+        var box=document.getElementById('pDelAll'), all=!!(box&&box.checked);
+        okBtn.disabled=true; err('');
+        try{
+          if(all){
+            for(var i=0;i<c.own.length;i++) await vomDeleteLibraryDataset(c.own[i].id);
+            await _vomTx('outputs','readwrite',function(s){ c.outputs.forEach(function(o){s.delete(o.id);}); });
+            await _vomTx('runs','readwrite',function(s){ c.runs.forEach(function(r){s.delete(r.id);}); });
+            await _vomTx('manifests','readwrite',function(s){ c.manifests.forEach(function(m){s.delete(m.id);}); });
+          } else {
+            await unlinkDatasets(p,c.own);
+          }
+          await unlinkDatasets(p,c.shared);
+          await finishDelete(p);
+        }catch(e){
+          err('Could not finish deleting \u2014 '+((e&&e.message)||'unknown error')+'. Try again.');
+        }finally{ okBtn.disabled=false; }
+      });
+    var box=document.getElementById('pDelAll');
+    if(box) box.addEventListener('change',function(){
+      document.getElementById('pDelNote').innerHTML=box.checked?goneNote:keepNote;
+      okBtn.textContent=box.checked?'Delete everything':'Delete project';
+    });
   }
 
   /* Getting an output back out. A browser project's outputs live in IndexedDB,
