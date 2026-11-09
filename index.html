@@ -49,12 +49,11 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 .suite-nav a.ext{font-family:var(--font);font-size:.8rem;color:rgba(255,255,255,.6)}
 
 /* ── Hero ───────────────────────────────────────────────── */
-.hero{background:var(--primary);color:#fff;padding:1.6rem 1.5rem 2.4rem;box-shadow:0 2px 6px rgba(0,0,0,.15)}
-.hero .in{max-width:1040px;margin:0 auto}
-.hero h2{font-size:2rem;font-weight:700;line-height:1.22;letter-spacing:-.02em;margin-bottom:.6rem}
-.hero p{font-size:.95rem;opacity:.85;max-width:640px;line-height:1.65}
-.hero .tags{margin-top:1rem;display:flex;gap:.4rem;flex-wrap:wrap}
-.hero .tags span{font-size:.72rem;background:rgba(255,255,255,.14);padding:.2rem .55rem;border-radius:99px}
+.hero{background:var(--primary);color:#fff;padding:1.25rem 1.5rem;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+/* 892px is the content width of .wrap (940 less its padding), so the cards
+   line up with the Projects Hub below. */
+.hero .in{max-width:892px;margin:0 auto}
+.hero .tool-row{margin-bottom:0}
 
 /* ── Layout ─────────────────────────────────────────────── */
 .wrap{max-width:940px;margin:0 auto;padding:1.6rem 1.5rem 3rem}
@@ -100,8 +99,9 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 @media(max-width:640px){
   .header-top,.hero{padding-left:.9rem;padding-right:.9rem}
   .wrap{padding:1.2rem .9rem 2rem}
-  .hero h1{font-size:1.5rem}
 }
+/* Five cards in two columns leave the last one alone; let it take the row. */
+@media(max-width:530px){.hero .tool-card:last-child{grid-column:1/-1}}
 
 .vom-tagline{font-family:var(--display);font-size:1.12rem;line-height:1;color:#5fd0bd;white-space:nowrap;flex:0 0 auto;margin-left:-.55rem}
 /* The nav sits at the tagline's size now, so the ribbon needs ~1050px to
@@ -365,24 +365,17 @@ body{font-family:var(--font);background:var(--bg-page);color:var(--text);font-si
 
 <section class="hero">
   <div class="in">
-    <h2>Powerful image analysis, right in your browser.</h2>
-    <p>Vis-O-Matic is a free suite of tools for working with image datasets. Organise and curate them in Image Manager, cut regions out with Image Cutter, measure colour with the Batch Image Analyzer, plot the results in Image Visualizer, and register 360&deg; frames to true north with SunSync 360. Group your work into a project and it carries across all five.</p>
-    <div class="tags">
-      <span>Runs in the browser</span><span>Nothing uploaded</span><span>No installation</span><span>No account</span><span>Free and open source</span>
+    <div class="tool-row">
+      <a class="tool-card" href="https://www.jonathancinnamon.com/image-manager/"><b>Image Manager</b><span>Hold, curate and organise your image datasets.</span></a>
+      <a class="tool-card" href="https://www.jonathancinnamon.com/image-cutter/"><b>Image Cutter</b><span>Cut any region out of an image with a segmentation model.</span></a>
+      <a class="tool-card" href="https://www.jonathancinnamon.com/image-colour-analyzer/"><b>Batch Image Analyzer</b><span>Measure colour across a whole set at once.</span></a>
+      <a class="tool-card" href="https://www.jonathancinnamon.com/image-colour-visualizer/"><b>Image Visualizer</b><span>Plot colour values as strips, grids, scatters and wheels.</span></a>
+      <a class="tool-card" href="https://www.jonathancinnamon.com/sunsync-360/"><b>SunSync 360</b><span>Register 360° frames to true north using the sun.</span></a>
     </div>
   </div>
 </section>
 
 <div class="wrap">
-
-    <div class="sec-title">The tools</div>
-  <div class="tool-row">
-    <a class="tool-card" href="https://www.jonathancinnamon.com/image-manager/"><b>Image Manager</b><span>Hold, curate and organise your image datasets.</span></a>
-    <a class="tool-card" href="https://www.jonathancinnamon.com/image-cutter/"><b>Image Cutter</b><span>Cut any region out of an image with a segmentation model.</span></a>
-    <a class="tool-card" href="https://www.jonathancinnamon.com/image-colour-analyzer/"><b>Batch Image Analyzer</b><span>Measure colour across a whole set at once.</span></a>
-    <a class="tool-card" href="https://www.jonathancinnamon.com/image-colour-visualizer/"><b>Image Visualizer</b><span>Plot colour values as strips, grids, scatters and wheels.</span></a>
-    <a class="tool-card" href="https://www.jonathancinnamon.com/sunsync-360/"><b>SunSync 360</b><span>Register 360° frames to true north using the sun.</span></a>
-  </div>
 
   <section class="proj-box" id="projects">
     <div class="hub-brand">
